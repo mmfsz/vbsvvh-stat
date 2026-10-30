@@ -1,0 +1,6 @@
+# Signal hypotheses of the analysis. Every channel names its signal processes
+# exactly like this, so a hypothesis is one process, and one signal strength,
+# across all channels. The value is the plot label (matplotlib mathtext).
+Signal_C2V_1p0_C3_1p0: "SM"
+Signal_C2V_1p5_C3_1p0: '$\kappa_{2V}=1.5$'
+Signal_C2V_1p0_C3_10p0: '$\kappa_{\lambda}=10$'

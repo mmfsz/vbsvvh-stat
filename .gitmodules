@@ -1,0 +1,4 @@
+[submodule "systematics"]
+	path = systematics
+	url = https://gitlab.cern.ch/cms-analysis/general/systematics.git
+	branch = master

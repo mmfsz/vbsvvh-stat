@@ -1,0 +1,56 @@
+# Luminosity: integrated luminosity per era and the LUM POG uncertainty tables.
+#
+# The uncertainty tables are copied as published. Each nuisance gives the lnN
+# kappa per year; an era takes the column of its year. Using only the columns
+# of the years present in a fit reproduces exactly the covariance of those
+# years, so one table serves every combination of years.
+
+# Integrated luminosity per era [fb^-1], as used by RDF run3-vbsvvh.
+# An era not listed here is not implemented yet: inputs carrying it are rejected.
+luminosity:
+  2016preVFP: 19.52
+  2016postVFP: 16.81
+  2017: 41.48
+  2018: 59.83
+  2024: 109.95
+  2025: 110.84
+
+# Era -> luminosity year.
+year:
+  2016preVFP: 2016
+  2016postVFP: 2016
+  2017: 2017
+  2018: 2018
+  2022: 2022
+  2022EE: 2022
+  2023: 2023
+  2023BPix: 2023
+  2024: 2024
+  2025: 2025
+
+uncertainties:
+  # Run 2: TWiki LumiRecommendationsRun2, "new recommendation scheme" (Cholesky
+  # minimal decomposition), 3 parameters for 2016+2017+2018.
+  lumi_13TeV_1516_l:
+    kappa: {2016: 1.0118}
+    description: "Run 2 luminosity, LUM POG Cholesky component acting on 2015-2016"
+  lumi_13TeV_151617_l:
+    kappa: {2016: 1.0004, 2017: 1.0055}
+    description: "Run 2 luminosity, LUM POG Cholesky component acting on 2015-2017"
+  lumi_13TeV_15161718_l:
+    kappa: {2016: 1.0035, 2017: 1.0061, 2018: 1.0084}
+    description: "Run 2 luminosity, LUM POG Cholesky component acting on 2015-2018"
+  # Run 3: TWiki LumiRecommendationsRun3 (Dec 2025), nuisances for analyses
+  # combining 2022+2023+2024 (published as lumi_1, lumi_2, lumi_3), named here by
+  # the years each acts on.
+  lumi_13p6TeV_222324:
+    kappa: {2022: 1.0138, 2023: 1.0017, 2024: 1.0020}
+  lumi_13p6TeV_2324:
+    kappa: {2023: 1.0127, 2024: 1.0068}
+  lumi_13p6TeV_2024:
+    kappa: {2024: 1.0144}
+  # 2025: TWiki LumiRecommendationsRun3 (Feb 2026), preliminary, 5%,
+  # uncorrelated with previous years.
+  lumi_13p6TeV_2025:
+    kappa: {2025: 1.05}
+    description: "2025 luminosity, preliminary 5% (LUM POG), uncorrelated with previous years"

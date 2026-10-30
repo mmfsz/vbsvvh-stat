@@ -1,0 +1,47 @@
+# Every nuisance a channel may deliver in its shapes.root, for the whole analysis.
+#
+# "{era}" stands for any datacard era tag (2016preVFP ... 2025). A name in the CMS
+# dictionary (systematics/systematics_master.yml) needs nothing else; any other
+# name needs a description, and is declared "custom" for the CMS name check. An
+# "{era}" entry the dictionary covers only for some eras gives the description for the others.
+#
+# A nuisance named after the signal ("*_vbsvvh") is carried by the signal processes only.
+#
+# "core: true" marks a nuisance every channel must carry: a combined result stops
+# if one of its channels lacks it. Any other nuisance is carried by the channels it
+# applies to. The core is decided by the analysis contacts only.
+
+# b tagging: BTV fixed-WP scale factors, correlated + uncorrelated scheme. Core while every
+# channel uses b tagging with this scheme.
+CMS_btag_fixedWP_bc_correlated: {core: true}
+CMS_btag_fixedWP_bc_uncorrelated_{era}: {core: true}
+CMS_btag_fixedWP_light_correlated: {core: true}
+CMS_btag_fixedWP_light_uncorrelated_{era}: {core: true}
+CMS_l1_ecal_prefiring: {core: true}
+CMS_pileup_13TeV: {core: true}
+CMS_pileup_13p6TeV: {core: true}
+CMS_res_j_13TeV: {core: true}
+CMS_res_j_13p6TeV: {core: true}
+CMS_scale_j_Absolute: {core: true}
+CMS_scale_j_Absolute_{era}: {core: true}
+CMS_scale_j_BBEC1: {core: true}
+CMS_scale_j_BBEC1_{era}: {core: true}
+CMS_scale_j_EC2: {core: true}
+CMS_scale_j_EC2_{era}: {core: true}
+CMS_scale_j_FlavorQCD: {core: true}
+CMS_scale_j_HF: {core: true}
+CMS_scale_j_HF_{era}: {core: true}
+CMS_scale_j_RelativeBal: {core: true}
+CMS_scale_j_RelativeSample_{era}: {core: true}
+CMS_scale_met_unclustered_energy_{era}:
+  core: true
+  description: "MET unclustered energy scale, per era (the CMS dictionary has no entry yet for some Run 3 eras)"
+ps_fsr: {core: true}
+ps_isr: {core: true}
+QCDscale_fac_vbsvvh:
+  core: true
+  description: "QCD factorization scale variation for VBS VVH signal (LHEScaleWeight[3]/[5]). The CMS dictionary's QCDscale_fac_<proc> has no VBS VVH process class"
+pdf_Higgs_qqbar: {core: true}
+QCDscale_ren_vbsvvh:
+  core: true
+  description: "QCD renormalization scale variation for VBS VVH signal (LHEScaleWeight[1]/[7]). Identically 1 for the signal, which is pure-EW at LO"
