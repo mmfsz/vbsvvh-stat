@@ -102,11 +102,12 @@ def sample_ratios(files):
     return out
 
 
-def build_table(skim_dirs, xsec, log=print):
+def build_table(skim_dirs, xsec, signals=None, log=print):
     """``{nuisance: {signal: {era: [up, down]}}}`` from the signal sample directories.
 
-    ``xsec``: ``{"run2"|"run3": {"<process>_c2v.._c3..": xsec}}``. A hypothesis needs all
-    four processes in an era; an incomplete one is reported and left out.
+    ``xsec``: ``{"run2"|"run3": {"<process>_c2v.._c3..": xsec}}``. Only the hypotheses in
+    ``signals`` (all if None) are built. A hypothesis needs all four processes in an
+    era; an incomplete one is reported and left out.
     """
     per = {}
     for base in skim_dirs:
@@ -118,6 +119,8 @@ def build_table(skim_dirs, xsec, log=print):
             if not files:
                 continue
             proc, signal, era = parsed
+            if signals is not None and signal not in signals:
+                continue
             per.setdefault((signal, era), {}).setdefault(proc, []).extend(files)
 
     table = {}

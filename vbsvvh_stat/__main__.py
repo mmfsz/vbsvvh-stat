@@ -78,8 +78,9 @@ def _impacts(args):
 def _theory_table(args):
     from .config import load_yaml
     from .theory import build_table, write_table
-    table = build_table(args.skims, load_yaml(args.xsec))
-    write_table(args.output, table, {"skims": [str(s) for s in args.skims], "xsec": args.xsec})
+    table = build_table(args.skims, load_yaml(args.xsec), signals=set(Analysis().signals))
+    from pathlib import Path
+    write_table(args.output, table, {"skims": [str(s) for s in args.skims], "xsec": Path(args.xsec).name})
     print(f"wrote {args.output}")
     return 0
 

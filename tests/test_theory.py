@@ -173,8 +173,12 @@ def test_build_table_weights_processes_by_cross_section(tmp_path):
         d_.mkdir()
         _runs_file(d_ / "a.root", u, d, 3.0)
         _runs_file(d_ / "b.root", u, d, 1.0)
+    other = tmp_path / "VBSWZH_c2v0p25_c3_1p0_UL18"   # a hypothesis outside the result: skipped
+    other.mkdir()
+    _runs_file(other / "a.root", 0.5, 2.0, 1.0)
     xsec = {"run2": {f"{p}_c2v1p5_c3_1p0": (3.0 if p == "VBSWWH_OS" else 1.0) for p in procs}}
-    table = build_table([tmp_path], xsec, log=lambda *_: None)
+    table = build_table([tmp_path], xsec, signals={SIG}, log=lambda *_: None)
+    assert set(table[MUF]) == {SIG}
     assert table[MUF][SIG]["2018"] == pytest.approx([(3 * 0.8 + 3 * 0.9) / 6, (3 * 1.2 + 3 * 1.1) / 6])
     assert table["ps_fsr"][SIG]["2018"] == pytest.approx([0.99, 1.02])
     assert table["ps_isr"][SIG]["2018"] == pytest.approx([1.01, 0.98])
