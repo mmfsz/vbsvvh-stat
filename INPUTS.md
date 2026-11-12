@@ -49,6 +49,17 @@ One TH1 per era, region and process, with the sum of squared weights stored
   The nuisances marked `core: true` are carried by every channel; the others by the
   channels they apply to. To add a nuisance, see "Adding a nuisance" in the README.
   A nuisance named after the signal (`*_vbsvvh`) goes on the signal processes only.
+- **Signal theory variations** (`QCDscale_fac_vbsvvh`, `QCDscale_ren_vbsvvh`, `ps_isr`,
+  `ps_fsr`: `acceptance: true` in `nuisances.yaml`) are best delivered **raw**: the
+  varied yield from the generator weight, cross section included, with nothing divided
+  out. Say so in `channel.yaml` (`theory: raw`). The tool then writes them as the result
+  asks, acceptance-only by default, dividing each era by the same variation's
+  generator-level ratio (`theory_inclusive.yaml`), so every channel uses the same
+  denominator. A channel that already divided by the generator-level ratio declares
+  `theory: acceptance`. Dividing by the yield after a skim or preselection is neither,
+  and does not remove the cross-section part. The PDF row is not covered: its
+  acceptance-only form needs each eigenvector divided before the quadrature sum, which
+  only the channel can do.
 - **Normalisation uncertainties** (cross sections, trigger, ...) are delivered like
   the others, as Up/Down histograms equal to nominal × (1 ± x).
 - **Not to be delivered** (the tool adds them, and the names are reserved):
@@ -60,6 +71,7 @@ One TH1 per era, region and process, with the sum of squared weights stored
 ```yaml
 channel: MET1FJ                                     # channel tag
 abcd: {background: bkg, A: A, B: B, C: C, D: D}     # only for an ABCD channel
+theory: raw                                          # raw | acceptance, see below
 provenance: {...}                                    # optional, free-form
 ```
 
@@ -70,4 +82,7 @@ provenance: {...}                                    # optional, free-form
   background histograms are optional: if present they are its MC prediction, used
   for the non-closure uncertainty; if absent, the non-closure is given in the
   result configuration.
+- `theory`: how the signal theory variations were delivered: `raw` (varied yield over
+  nominal yield, cross section included) or `acceptance` (each era divided by the
+  generator-level ratio of the same variation). Required when the signal carries one.
 - `provenance`: anything that identifies how the inputs were made; it is copied into the results.

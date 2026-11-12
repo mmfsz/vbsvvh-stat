@@ -3,6 +3,7 @@
     vbsvvh-stat validate CHANNEL.yaml
     vbsvvh-stat run RESULT.yaml [--stage cards|limits] [--plots-only] [--jobs N]
     vbsvvh-stat impacts RESULT.yaml [--fit F] [--signal S] [--plots-only] [--jobs N]
+    vbsvvh-stat theory-table SKIM_DIR... [--xsec theory_xsec.yaml] [--output theory_inclusive.yaml]
 """
 
 import argparse
@@ -11,7 +12,7 @@ import shutil
 import sys
 
 from . import cards, combine, plots, provenance
-from .config import Analysis, ConfigError, load_channel, load_result
+from .config import REPO, Analysis, ConfigError, load_channel, load_result
 from .naming import Dictionary
 
 
@@ -74,6 +75,15 @@ def _impacts(args):
     return 0
 
 
+def _theory_table(args):
+    from .config import load_yaml
+    from .theory import build_table, write_table
+    table = build_table(args.skims, load_yaml(args.xsec))
+    write_table(args.output, table, {"skims": [str(s) for s in args.skims], "xsec": args.xsec})
+    print(f"wrote {args.output}")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="vbsvvh-stat", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -94,6 +104,11 @@ def main(argv=None):
     i.add_argument("--plots-only", action="store_true", help="redraw the plots from impacts.json")
     i.add_argument("--jobs", type=int, default=4)
     i.set_defaults(func=_impacts)
+    t = sub.add_parser("theory-table", help="generator-level ratios of the signal theory variations")
+    t.add_argument("skims", nargs="+", help="directories holding the signal sample directories (NanoAOD skims)")
+    t.add_argument("--xsec", default=str(REPO / "theory_xsec.yaml"))
+    t.add_argument("--output", default=str(REPO / "theory_inclusive.yaml"))
+    t.set_defaults(func=_theory_table)
     args = ap.parse_args(argv)
     try:
         return args.func(args)

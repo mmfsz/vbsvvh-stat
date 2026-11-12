@@ -163,6 +163,10 @@ def validate(channel, analysis, shapes=None):
             bad = [n for n in shapes.nuisances(process=p) if n.endswith(SIGNAL_ONLY_SUFFIX)]
             if bad:
                 errors.append(f"{p}: {bad} act on the signal only")
+    theory = sorted({n for p in signals for n in shapes.nuisances(process=p) if analysis.is_theory(n)})
+    if theory and not channel.get("theory"):
+        errors.append(f"signal carries {theory}: declare in channel.yaml whether they are delivered "
+                      "'theory: raw' (cross section included) or 'theory: acceptance' (see INPUTS.md)")
 
     for era in shapes.eras:
         for region in shapes.regions(era):
