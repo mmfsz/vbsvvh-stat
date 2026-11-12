@@ -15,6 +15,9 @@ RUNS = {"Run2": ERAS[:4], "Run3": ERAS[4:]}
 ENERGIES = {"13TeV": RUNS["Run2"], "13p6TeV": RUNS["Run3"]}
 #: Prefix of the nuisances specific to this analysis (its CMS analysis number).
 ANALYSIS_PREFIX = "CMS_HIG26013"
+#: How a channel delivers a signal theory variation: ``raw`` (cross section included)
+#: or ``acceptance`` (divided by the generator-level ratio). See theory.py.
+THEORY_MODES = ("raw", "acceptance")
 
 
 class ConfigError(ValueError):
@@ -36,7 +39,7 @@ class Analysis:
     def __init__(self, root=REPO):
         self.nuisances = load_yaml(root / "nuisances.yaml")
         for name, entry in self.nuisances.items():
-            unknown = set(entry or {}) - {"core", "description"}
+            unknown = set(entry or {}) - {"core", "description", "acceptance"}
             if unknown:
                 raise ConfigError(f"nuisances.yaml: {name}: unknown key(s) {sorted(unknown)}")
         self.signals = load_yaml(root / "signals.yaml")
@@ -47,6 +50,13 @@ class Analysis:
                             "description": entry.get("description")}
                      for name, entry in lumi["uncertainties"].items()}
         self.master = root / "systematics" / "systematics_master.yml"
+        from .theory import load_table
+        self.theory = load_table(root / "theory_inclusive.yaml")
+
+    def is_theory(self, name):
+        """True for a signal theory nuisance whose normalisation the result decides."""
+        entry = self.nuisance_entry(name)
+        return bool(entry and (self.nuisances.get(entry) or {}).get("acceptance"))
 
     def nuisance_entry(self, name):
         """The nuisances.yaml key that ``name`` is an instance of, or None."""
@@ -67,7 +77,7 @@ def load_channel(path):
     """channel.yaml -> dict with ``tag``, ``shapes`` (absolute), ``abcd``, ``provenance``."""
     path = Path(path).resolve()
     raw = load_yaml(path)
-    unknown = set(raw) - {"channel", "abcd", "provenance"}
+    unknown = set(raw) - {"channel", "abcd", "provenance", "theory"}
     if unknown:
         raise ConfigError(f"{path}: unknown key(s) {sorted(unknown)}")
     tag = raw.get("channel")
@@ -80,17 +90,21 @@ def load_channel(path):
             raise ConfigError(f"{path}: abcd is missing {missing}")
         if len({abcd[r] for r in "ABCD"}) != 4:
             raise ConfigError(f"{path}: abcd regions must be four distinct regions")
+    theory = raw.get("theory")
+    if theory is not None and theory not in THEORY_MODES:
+        raise ConfigError(f"{path}: 'theory' must be one of {list(THEORY_MODES)}, not {theory!r}")
     shapes = path.parent / "shapes.root"
     if not shapes.exists():
         raise ConfigError(f"{path}: no shapes.root beside it")
-    return {"tag": tag, "shapes": shapes, "abcd": abcd, "provenance": raw.get("provenance")}
+    return {"tag": tag, "shapes": shapes, "abcd": abcd, "theory": theory, "provenance": raw.get("provenance")}
 
 
 def load_result(path, analysis):
     """A result YAML, with ``runs``/``fits`` left for :func:`resolve_runs` once eras are known."""
     path = Path(path).resolve()
     raw = load_yaml(path)
-    unknown = set(raw) - {"name", "channels", "signals", "runs", "fits", "impacts", "closure", "unblind"}
+    unknown = set(raw) - {"name", "channels", "signals", "runs", "fits", "impacts", "closure", "unblind",
+                          "theory"}
     if unknown:
         raise ConfigError(f"{path}: unknown key(s) {sorted(unknown)}")
     for key in ("name", "channels", "signals"):
@@ -98,6 +112,9 @@ def load_result(path, analysis):
             raise ConfigError(f"{path}: '{key}' is required")
     if raw.get("unblind", False) not in (True, False):
         raise ConfigError(f"{path}: 'unblind' must be true or false")
+    theory = raw.get("theory", "acceptance")
+    if theory not in ("acceptance", "total"):
+        raise ConfigError(f"{path}: 'theory' must be acceptance or total, not {theory!r}")
     bad = [s for s in raw["signals"] if s not in analysis.signals]
     if bad:
         raise ConfigError(f"{path}: signals {bad} not in signals.yaml")
@@ -110,7 +127,10 @@ def load_result(path, analysis):
                 raise ConfigError(f"{path}: channel {tag!r} points to a channel.yaml with tag {ch['tag']!r}")
             if ch["abcd"] != inputs[0]["abcd"]:
                 raise ConfigError(f"{path}: the inputs of channel {tag!r} differ in their abcd block")
-        channels[tag] = {"tag": tag, "abcd": inputs[0]["abcd"], "inputs": inputs,
+            if ch["theory"] != inputs[0]["theory"]:
+                raise ConfigError(f"{path}: the inputs of channel {tag!r} differ in their theory declaration")
+        channels[tag] = {"tag": tag, "abcd": inputs[0]["abcd"], "theory": inputs[0]["theory"],
+                         "inputs": inputs,
                          "shapes": [ch["shapes"] for ch in inputs]}
     name = raw["name"]
     results_dir = Path(os.environ.get("VBSVVH_STAT_RESULTS", REPO / "results")) / name
@@ -125,6 +145,7 @@ def load_result(path, analysis):
         "impacts": raw.get("impacts") or {},
         "closure": raw.get("closure") or {},
         "unblind": raw.get("unblind", False),
+        "theory": theory,
         "results_dir": results_dir,
         "work_dir": results_dir / "work",
     }

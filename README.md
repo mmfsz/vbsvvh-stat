@@ -48,6 +48,7 @@ impacts: {Run2: [Signal_C2V_1p5_C3_1p0], Run2Run3: [Signal_C2V_1p5_C3_1p0]}
 # closure: {MET1FJ: {Run2: 0.12}}              # ABCD non-closure instead of the MC value
 # fits:    {Run2Run3: [Run2, Run3]}             # instead of the default fits
 # unblind: true                                 # observed data in the cards (default: blinded)
+# theory: total                                 # signal theory rows with the cross section (default: acceptance)
 ```
 
 By default the eras of each run are summed into one plane, one card per (channel,
@@ -110,6 +111,37 @@ Up and Down separately.
 
 Shape regions are summed bin by bin in the same way.
 
+### Signal theory variations
+
+The QCD scale and parton-shower variations of the signal (`acceptance: true` in
+`nuisances.yaml`) move both its cross section and its acceptance. One result writes
+them one way in every channel: `theory: acceptance` (the default; the signal strength
+is relative to the generator cross section, which is factored out) or `theory: total`
+(the cross-section part kept). A channel declares how it delivered them
+(`channel.yaml`, `theory: raw | acceptance`), and the cards convert each era before
+the eras are summed:
+
+| delivered | result | each era's Up/Down |
+|---|---|---|
+| raw | acceptance | divided by the generator-level ratio |
+| acceptance | total | multiplied by it |
+| raw | total | unchanged |
+| acceptance | acceptance | unchanged |
+
+The ratios are in `theory_inclusive.yaml`, per nuisance, signal hypothesis and era:
+the varied over the nominal generator-level cross section (`Runs/LHEScaleSumw`,
+`Runs/PSSumw` of the NanoAOD skims), summed over the four VBS VVH processes with
+their cross sections (`theory_xsec.yaml`). Rebuild it when the signal samples change:
+
+```bash
+vbsvvh-stat theory-table /path/to/Run2_Sig_skims /path/to/Run3_Sig_skims
+```
+
+A conversion that needs a ratio the table lacks stops the cards. For the VBS VVH
+signal at LO the factorisation-scale ratio is about 0.90/1.12 at the SM point and
+0.88/1.16 at kappa_2V = 1.5; the renormalisation scale is exactly 1 (no alpha_S in a
+pure-electroweak LO matrix element).
+
 ### ABCD
 
 Counting regions only. The data-driven background has rate 1 and absolute-yield
@@ -160,6 +192,9 @@ statistical error of the closure is underestimated in a projection.
 - `signals.yaml`: the signal hypotheses and their plot labels.
 - `nuisances.yaml`: every nuisance a channel may deliver.
 - `lumi.yaml`: luminosities and the LUM POG uncertainty tables (see "Luminosity" above).
+- `theory_inclusive.yaml`: generator-level ratios of the signal theory variations, built
+  by `vbsvvh-stat theory-table` from the skims and `theory_xsec.yaml` (see "Signal
+  theory variations" above).
 - `systematics/`: the CMS nuisance dictionary (submodule; update with
   `git submodule update --remote systematics`).
 

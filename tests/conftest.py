@@ -17,7 +17,7 @@ def th1(values, variances=None, edges=None, sumw2=True):
     return h
 
 
-def write_channel(directory, tag, hists, abcd=None, raw_keys=()):
+def write_channel(directory, tag, hists, abcd=None, raw_keys=(), theory="acceptance"):
     """``hists``: ``{"era/region/name": values | (values, variances) | th1}`` -> channel.yaml path."""
     import uproot
     directory.mkdir(parents=True, exist_ok=True)
@@ -31,6 +31,8 @@ def write_channel(directory, tag, hists, abcd=None, raw_keys=()):
         for key, content in raw_keys:
             f[key] = content
     cfg = {"channel": tag}
+    if theory:
+        cfg["theory"] = theory
     if abcd:
         cfg["abcd"] = abcd
     path = directory / "channel.yaml"

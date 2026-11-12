@@ -7,6 +7,11 @@
 #
 # A nuisance named after the signal ("*_vbsvvh") is carried by the signal processes only.
 #
+# "acceptance: true" marks a signal theory variation (QCD scales, parton shower) whose
+# normalisation, acceptance-only or cross section included, is decided by the result
+# ("theory:" in the result YAML), not by the channel; the card writer converts with the
+# generator-level ratios of theory_inclusive.yaml.
+#
 # "core: true" marks a nuisance every channel must carry: a combined result stops
 # if one of its channels lacks it. Any other nuisance is carried by the channels it
 # applies to. The core is decided by the analysis contacts only.
@@ -36,12 +41,14 @@ CMS_scale_j_RelativeSample_{era}: {core: true}
 CMS_scale_met_unclustered_energy_{era}:
   core: true
   description: "MET unclustered energy scale, per era (the CMS dictionary has no entry yet for some Run 3 eras)"
-ps_fsr: {core: true}
-ps_isr: {core: true}
+ps_fsr: {core: true, acceptance: true}
+ps_isr: {core: true, acceptance: true}
 QCDscale_fac_vbsvvh:
   core: true
+  acceptance: true
   description: "QCD factorization scale variation for VBS VVH signal (LHEScaleWeight[3]/[5]). The CMS dictionary's QCDscale_fac_<proc> has no VBS VVH process class"
 pdf_Higgs_qqbar: {core: true}
 QCDscale_ren_vbsvvh:
   core: true
+  acceptance: true
   description: "QCD renormalization scale variation for VBS VVH signal (LHEScaleWeight[1]/[7]). Identically 1 for the signal, which is pure-EW at LO"

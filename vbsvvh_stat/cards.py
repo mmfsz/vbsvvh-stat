@@ -8,7 +8,11 @@ A plane is the set of eras summed into one set of bins, by default one run
    renamed ``_<target>``;
 2. luminosity nuisances (lumi.yaml) are attached per era to signal and MC
    processes, as Up/Down variations;
-3. the eras are summed: nominal and Sumw2 add, and each nuisance is summed
+3. signal theory variations (``acceptance: true`` in nuisances.yaml) are brought
+   from the normalisation the channel delivered to the one the result asks for
+   (``theory: acceptance | total``), with the generator-level ratios of
+   theory_inclusive.yaml (see theory.py);
+4. the eras are summed: nominal and Sumw2 add, and each nuisance is summed
    varied where an era carries it and nominal where it does not. On a summed
    bin this is the diluted kappa of an era-tagged nuisance,
    ``1 + (Y_era / Y_tot) (k_era - 1)``, and the summed ratio of a correlated one.
@@ -38,6 +42,7 @@ import numpy as np
 from .config import ANALYSIS_PREFIX, ConfigError, resolve_fits, resolve_runs
 from .inputs import DATA, Hist, Shapes, add, background_kind, scale, validate
 from .naming import write_declaration
+from .theory import factors
 
 #: A variation within this of 1 in both directions is not written.
 NULL_KAPPA = 1e-4
@@ -48,8 +53,9 @@ MIN_RATIO = 1e-6
 class Plane:
     """One channel's histograms summed over the eras of one plane."""
 
-    def __init__(self, channel, shapes, name, cfg, analysis):
+    def __init__(self, channel, shapes, name, cfg, analysis, theory="acceptance"):
         self.channel = channel
+        self.theory = theory
         self.tag = channel["tag"]
         self.name = name
         self.analysis = analysis
@@ -86,6 +92,12 @@ class Plane:
             if n and source != era and n.endswith("_" + source):
                 n = n[: -len(source)] + era
             out[(r, p, n, d)] = scale(h, factor)
+        for (r, p, n, d), h in list(out.items()):
+            if n and self.kind(p) == "signal" and self.analysis.is_theory(n):
+                f = factors(self.analysis.theory, self.analysis.nuisance_entry(n), p, source,
+                            self.channel["theory"], self.theory)
+                if f is not None:
+                    out[(r, p, n, d)] = scale(h, f[0] if d == "Up" else f[1])
         for (r, p, n, d), h in list(out.items()):
             if n is None and self.kind(p) in ("signal", "mc"):
                 for lumi_n, k in self.analysis.lumi_kappas(era).items():
@@ -226,6 +238,9 @@ def card_text(plane, signal, closure, shapes_file=None, blind=True):
             lines.append(f"# ABCD non-closure delta = {_fmt(closure['delta'])}, MC stat error = "
                          f"{_fmt(closure['error'])} ({closure['method']}) -> lnN 1 + sqrt(delta^2 + error^2) "
                          f"= {_fmt(closure['kappa'])}")
+    if plane.channel.get("theory"):
+        lines.append(f"# signal theory variations: delivered {plane.channel['theory']}, "
+                     f"written {plane.theory} (generator-level ratios, theory_inclusive.yaml)")
     blind = blind and not shape
     if blind:
         lines.append("# BLINDED: no observed data; only -t -1 fits are possible")
@@ -348,7 +363,7 @@ def write_cards(result, analysis, dictionary, log=print):
     summary, nuisances = {}, set()
     for tag, ch in result["channels"].items():
         for name, cfg in planes.items():
-            plane = Plane(ch, shapes[tag], name, cfg, analysis)
+            plane = Plane(ch, shapes[tag], name, cfg, analysis, result["theory"])
             if not plane.eras:
                 continue
             closure = None
@@ -362,6 +377,7 @@ def write_cards(result, analysis, dictionary, log=print):
             summary.setdefault(tag, {})[name] = {
                 "eras": plane.eras, "substitute": plane.substitute,
                 "mode": "shape" if root else "counting", "closure": closure,
+                "theory": {"delivered": ch["theory"], "written": result["theory"]},
                 "blinded": not result["unblind"] and not root,
             }
             for signal in result["signals"]:
