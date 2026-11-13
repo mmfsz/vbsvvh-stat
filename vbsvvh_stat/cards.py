@@ -11,7 +11,9 @@ A plane is the set of eras summed into one set of bins, by default one run
 3. signal theory variations (``acceptance: true`` in nuisances.yaml) are brought
    from the normalisation the channel delivered to the one the result asks for
    (``theory: acceptance | total``), with the generator-level ratios of
-   theory_inclusive.yaml (see theory.py);
+   theory_inclusive.yaml (see theory.py); a ``skim`` delivery is first multiplied
+   back by the varied/nominal yield of its normalisation region, which is not
+   written to the cards;
 4. the eras are summed: nominal and Sumw2 add, and each nuisance is summed
    varied where an era carries it and nominal where it does not. On a summed
    bin this is the diluted kappa of an era-tagged nuisance,
@@ -48,6 +50,16 @@ from .theory import factors
 NULL_KAPPA = 1e-4
 #: Floor for a varied/nominal ratio, which lnN cannot take as zero.
 MIN_RATIO = 1e-6
+
+
+def skim_ratio(skim, process, nuisance, direction, era, norm):
+    """Varied over nominal yield of ``process`` in the normalisation region ``norm``."""
+    nom = skim.get((norm, process, None, None))
+    var = skim.get((norm, process, nuisance, direction))
+    if nom is None or var is None or nom.values.sum() <= 0:
+        raise ConfigError(f"{era}/{norm}: theory: skim needs {process} and its {nuisance}{direction} "
+                          "in the normalisation region")
+    return float(var.values.sum() / nom.values.sum())
 
 
 class Plane:
@@ -92,10 +104,20 @@ class Plane:
             if n and source != era and n.endswith("_" + source):
                 n = n[: -len(source)] + era
             out[(r, p, n, d)] = scale(h, factor)
+        delivered = self.channel["theory"]
+        norm = self.channel.get("theory_norm")
+        if norm:
+            # skim delivery: undo the division by the post-skim yield, giving raw
+            skim = {k: h for k, h in out.items() if k[0] == norm}
+            out = {k: h for k, h in out.items() if k[0] != norm}
+            for (r, p, n, d), h in list(out.items()):
+                if n and self.kind(p) == "signal" and self.analysis.is_theory(n):
+                    out[(r, p, n, d)] = scale(h, skim_ratio(skim, p, n, d, era, norm))
+            delivered = "raw"
         for (r, p, n, d), h in list(out.items()):
             if n and self.kind(p) == "signal" and self.analysis.is_theory(n):
                 f = factors(self.analysis.theory, self.analysis.nuisance_entry(n), p, source,
-                            self.channel["theory"], self.theory)
+                            delivered, self.theory)
                 if f is not None:
                     out[(r, p, n, d)] = scale(h, f[0] if d == "Up" else f[1])
         for (r, p, n, d), h in list(out.items()):
@@ -239,7 +261,8 @@ def card_text(plane, signal, closure, shapes_file=None, blind=True):
                          f"{_fmt(closure['error'])} ({closure['method']}) -> lnN 1 + sqrt(delta^2 + error^2) "
                          f"= {_fmt(closure['kappa'])}")
     if plane.channel.get("theory"):
-        lines.append(f"# signal theory variations: delivered {plane.channel['theory']}, "
+        norm = f" (to {plane.channel['theory_norm']})" if plane.channel.get("theory_norm") else ""
+        lines.append(f"# signal theory variations: delivered {plane.channel['theory']}{norm}, "
                      f"written {plane.theory} (generator-level ratios, theory_inclusive.yaml)")
     blind = blind and not shape
     if blind:
@@ -377,7 +400,8 @@ def write_cards(result, analysis, dictionary, log=print):
             summary.setdefault(tag, {})[name] = {
                 "eras": plane.eras, "substitute": plane.substitute,
                 "mode": "shape" if root else "counting", "closure": closure,
-                "theory": {"delivered": ch["theory"], "written": result["theory"]},
+                "theory": {"delivered": ch["theory"], "written": result["theory"],
+                           **({"norm": ch["theory_norm"]} if ch.get("theory_norm") else {})},
                 "blinded": not result["unblind"] and not root,
             }
             for signal in result["signals"]:

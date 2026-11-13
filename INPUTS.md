@@ -56,8 +56,14 @@ One TH1 per era, region and process, with the sum of squared weights stored
   asks, acceptance-only by default, dividing each era by the same variation's
   generator-level ratio (`theory_inclusive.yaml`), so every channel uses the same
   denominator. A channel that already divided by the generator-level ratio declares
-  `theory: acceptance`. Dividing by the yield after a skim or preselection is neither,
-  and does not remove the cross-section part. The PDF row is not covered: its
+  `theory: acceptance`. A channel that divided by its own post-skim yield (varied
+  over nominal events after the skim, not the generator cross section) declares
+  `theory: skim` and delivers that yield as an extra region named in `theory_norm`
+  (signal nominal and Up/Down, no data); the tool multiplies it back out and divides
+  by the generator-level ratio instead. The skim keeps high-x events, whose muF weight
+  is further from 1 than the generator-level mean, so a post-skim denominator removes
+  part of the acceptance change too (AllHad2FJ region A: ±3.5% instead of ±6–7.5%).
+  The PDF row is not covered: its
   acceptance-only form needs each eigenvector divided before the quadrature sum, which
   only the channel can do.
 - **Normalisation uncertainties** (cross sections, trigger, ...) are delivered like
@@ -71,7 +77,8 @@ One TH1 per era, region and process, with the sum of squared weights stored
 ```yaml
 channel: MET1FJ                                     # channel tag
 abcd: {background: bkg, A: A, B: B, C: C, D: D}     # only for an ABCD channel
-theory: raw                                          # raw | acceptance, see below
+theory: raw                                          # raw | acceptance | skim, see below
+# theory_norm: all_events                           # only for theory: skim
 provenance: {...}                                    # optional, free-form
 ```
 
@@ -83,6 +90,11 @@ provenance: {...}                                    # optional, free-form
   for the non-closure uncertainty; if absent, the non-closure is given in the
   result configuration.
 - `theory`: how the signal theory variations were delivered: `raw` (varied yield over
-  nominal yield, cross section included) or `acceptance` (each era divided by the
-  generator-level ratio of the same variation). Required when the signal carries one.
+  nominal yield, cross section included), `acceptance` (each era divided by the
+  generator-level ratio of the same variation) or `skim` (each era divided by the
+  varied over nominal signal yield of the region named in `theory_norm`). Required
+  when the signal carries one.
+- `theory_norm`: with `theory: skim` only, the region holding the post-skim signal
+  yield the variations were divided by. It is read for the conversion and not
+  written to the cards.
 - `provenance`: anything that identifies how the inputs were made; it is copied into the results.

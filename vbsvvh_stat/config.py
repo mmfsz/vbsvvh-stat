@@ -15,9 +15,10 @@ RUNS = {"Run2": ERAS[:4], "Run3": ERAS[4:]}
 ENERGIES = {"13TeV": RUNS["Run2"], "13p6TeV": RUNS["Run3"]}
 #: Prefix of the nuisances specific to this analysis (its CMS analysis number).
 ANALYSIS_PREFIX = "CMS_HIG26013"
-#: How a channel delivers a signal theory variation: ``raw`` (cross section included)
-#: or ``acceptance`` (divided by the generator-level ratio). See theory.py.
-THEORY_MODES = ("raw", "acceptance")
+#: How a channel delivers a signal theory variation: ``raw`` (cross section included),
+#: ``acceptance`` (divided by the generator-level ratio) or ``skim`` (divided by the
+#: varied yield of a post-skim normalisation region, ``theory_norm``). See theory.py.
+THEORY_MODES = ("raw", "acceptance", "skim")
 
 
 class ConfigError(ValueError):
@@ -77,7 +78,7 @@ def load_channel(path):
     """channel.yaml -> dict with ``tag``, ``shapes`` (absolute), ``abcd``, ``provenance``."""
     path = Path(path).resolve()
     raw = load_yaml(path)
-    unknown = set(raw) - {"channel", "abcd", "provenance", "theory"}
+    unknown = set(raw) - {"channel", "abcd", "provenance", "theory", "theory_norm"}
     if unknown:
         raise ConfigError(f"{path}: unknown key(s) {sorted(unknown)}")
     tag = raw.get("channel")
@@ -93,10 +94,19 @@ def load_channel(path):
     theory = raw.get("theory")
     if theory is not None and theory not in THEORY_MODES:
         raise ConfigError(f"{path}: 'theory' must be one of {list(THEORY_MODES)}, not {theory!r}")
+    norm = raw.get("theory_norm")
+    if theory == "skim" and not norm:
+        raise ConfigError(f"{path}: 'theory: skim' needs 'theory_norm', the region holding the "
+                          "post-skim yield the variations were divided by")
+    if norm and theory != "skim":
+        raise ConfigError(f"{path}: 'theory_norm' is only for 'theory: skim'")
+    if norm and abcd and norm in abcd.values():
+        raise ConfigError(f"{path}: 'theory_norm' {norm!r} is an ABCD region")
     shapes = path.parent / "shapes.root"
     if not shapes.exists():
         raise ConfigError(f"{path}: no shapes.root beside it")
-    return {"tag": tag, "shapes": shapes, "abcd": abcd, "theory": theory, "provenance": raw.get("provenance")}
+    return {"tag": tag, "shapes": shapes, "abcd": abcd, "theory": theory, "theory_norm": norm,
+            "provenance": raw.get("provenance")}
 
 
 def load_result(path, analysis):
@@ -127,9 +137,10 @@ def load_result(path, analysis):
                 raise ConfigError(f"{path}: channel {tag!r} points to a channel.yaml with tag {ch['tag']!r}")
             if ch["abcd"] != inputs[0]["abcd"]:
                 raise ConfigError(f"{path}: the inputs of channel {tag!r} differ in their abcd block")
-            if ch["theory"] != inputs[0]["theory"]:
+            if (ch["theory"], ch["theory_norm"]) != (inputs[0]["theory"], inputs[0]["theory_norm"]):
                 raise ConfigError(f"{path}: the inputs of channel {tag!r} differ in their theory declaration")
         channels[tag] = {"tag": tag, "abcd": inputs[0]["abcd"], "theory": inputs[0]["theory"],
+                         "theory_norm": inputs[0]["theory_norm"],
                          "inputs": inputs,
                          "shapes": [ch["shapes"] for ch in inputs]}
     name = raw["name"]

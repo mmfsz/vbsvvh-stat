@@ -38,8 +38,17 @@ def lnn(card_text, name):
     return {}
 
 
+#: Post-skim varied/nominal yield [Up, Down]: the skim keeps the high-x events, whose
+#: muF weight is further from 1 than the generator-level mean (AllHad2FJ: ~0.88/1.15).
+SKIM = {"2017": [0.85, 1.20], "2018": [0.87, 1.17]}
+
+
 def channel(tmp_path, theory, eras=(("2018", 2.0),), acc=1.02):
-    """One signal region; the varied yield = nominal x inclusive ratio x acceptance change."""
+    """One signal region; the varied yield = nominal x inclusive ratio x acceptance change.
+
+    ``skim``: the signal region divided by the varied/nominal yield of a post-skim
+    region ``presel`` (100 events nominal), which the channel delivers beside it.
+    """
     h = {}
     for era, y in eras:
         r_up, r_dn = TABLE[MUF][SIG][era]
@@ -48,11 +57,22 @@ def channel(tmp_path, theory, eras=(("2018", 2.0),), acc=1.02):
         h[f"{era}/SR/data_obs"] = 7.0
         if theory == "raw":
             up, dn = y * r_up * acc, y * r_dn / acc
+        elif theory == "skim":
+            s_up, s_dn = SKIM[era]
+            up, dn = y * r_up * acc / s_up, y * r_dn / acc / s_dn
+            h[f"{era}/presel/{SIG}"] = 100.0
+            h[f"{era}/presel/{SIG}__{MUF}Up"] = 100.0 * s_up
+            h[f"{era}/presel/{SIG}__{MUF}Down"] = 100.0 * s_dn
         else:
             up, dn = y * acc, y / acc
         h[f"{era}/SR/{SIG}__{MUF}Up"] = up
         h[f"{era}/SR/{SIG}__{MUF}Down"] = dn
-    return write_channel(tmp_path / f"ch_{theory}", "T", h, theory=theory)
+    path = write_channel(tmp_path / f"ch_{theory}", "T", h, theory=theory)
+    if theory == "skim":
+        cfg = yaml.safe_load(path.read_text())
+        cfg["theory_norm"] = "presel"
+        path.write_text(yaml.safe_dump(cfg))
+    return path
 
 
 def cards(tmp_path, monkeypatch, analysis, ch, **extra):
@@ -183,3 +203,61 @@ def test_build_table_weights_processes_by_cross_section(tmp_path):
     assert table["ps_fsr"][SIG]["2018"] == pytest.approx([0.99, 1.02])
     assert table["ps_isr"][SIG]["2018"] == pytest.approx([1.01, 0.98])
     assert table["QCDscale_ren_vbsvvh"][SIG]["2018"] == pytest.approx([1.0, 1.0])
+
+
+def test_skim_delivery_is_renormalised_to_the_generator_cross_section(tmp_path, monkeypatch, analysis):
+    """A post-skim denominator is undone and the generator-level one applied, era by era."""
+    eras = (("2017", 1.0), ("2018", 3.0))
+    text, index = cards(tmp_path, monkeypatch, analysis, channel(tmp_path, "skim", eras=eras))
+    dn, up = lnn(text, MUF)[("T_SR_Run2", SIG)]
+    assert up == pytest.approx(1.02) and dn == pytest.approx(1 / 1.02)
+    assert not any(line.split()[:1] == ["bin"] and any("presel" in b for b in line.split())
+                   for line in text.splitlines())
+    assert "delivered skim (to presel), written acceptance" in text
+    assert index["summary"]["T"]["Run2"]["theory"] == {"delivered": "skim", "written": "acceptance",
+                                                      "norm": "presel"}
+
+
+def test_skim_delivery_written_total(tmp_path, monkeypatch, analysis):
+    text, _ = cards(tmp_path, monkeypatch, analysis, channel(tmp_path, "skim"), theory="total")
+    dn, up = lnn(text, MUF)[("T_SR_Run2", SIG)]
+    assert up == pytest.approx(0.90 * 1.02) and dn == pytest.approx(1.12 / 1.02)
+
+
+def test_skim_and_raw_deliveries_give_the_same_card(tmp_path, monkeypatch, analysis):
+    raw, _ = cards(tmp_path / "a", monkeypatch, analysis, channel(tmp_path / "a", "raw"))
+    skim, _ = cards(tmp_path / "b", monkeypatch, analysis, channel(tmp_path / "b", "skim"))
+    assert lnn(raw, MUF) == pytest.approx(lnn(skim, MUF))
+
+
+def test_skim_without_norm_region_is_a_config_error(tmp_path):
+    path = channel(tmp_path, "skim")
+    cfg = yaml.safe_load(path.read_text())
+    cfg.pop("theory_norm")
+    path.write_text(yaml.safe_dump(cfg))
+    with pytest.raises(ConfigError, match="needs 'theory_norm'"):
+        load_channel(path)
+
+
+def test_theory_norm_only_with_skim(tmp_path):
+    path = channel(tmp_path, "raw")
+    cfg = yaml.safe_load(path.read_text())
+    cfg["theory_norm"] = "presel"
+    path.write_text(yaml.safe_dump(cfg))
+    with pytest.raises(ConfigError, match="only for 'theory: skim'"):
+        load_channel(path)
+
+
+def test_skim_norm_region_needs_no_data_and_must_carry_the_variations(tmp_path, analysis):
+    path = channel(tmp_path, "skim")
+    assert validate(load_channel(path), analysis)[0] == []
+    import uproot
+    shapes = path.parent / "shapes.root"
+    with uproot.open(shapes) as f:
+        keep = {k: f[k].to_hist() for k, cls in f.classnames(cycle=False).items()
+                if cls.startswith("TH1") and not ("presel" in k and "Down" in k)}
+    with uproot.recreate(shapes) as f:
+        for k, h in keep.items():
+            f[k] = h
+    errors = validate(load_channel(path), analysis)[0]
+    assert any("normalisation region lacks" in e for e in errors)

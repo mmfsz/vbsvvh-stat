@@ -117,9 +117,12 @@ The QCD scale and parton-shower variations of the signal (`acceptance: true` in
 `nuisances.yaml`) move both its cross section and its acceptance. One result writes
 them one way in every channel: `theory: acceptance` (the default; the signal strength
 is relative to the generator cross section, which is factored out) or `theory: total`
-(the cross-section part kept). A channel declares how it delivered them
-(`channel.yaml`, `theory: raw | acceptance`), and the cards convert each era before
-the eras are summed:
+(the cross-section part kept). The default follows the VBF HH convention: the LO
+scale variation is carried on the acceptance only, and the uncertainty of the cross
+section is quoted with the higher-order prediction it is compared to, not with the LO
+muF band (about ±10–15% here, from muF in the high-x PDFs). A channel declares how it
+delivered them (`channel.yaml`, `theory: raw | acceptance | skim`), and the cards
+convert each era before the eras are summed:
 
 | delivered | result | each era's Up/Down |
 |---|---|---|
@@ -127,6 +130,11 @@ the eras are summed:
 | acceptance | total | multiplied by it |
 | raw | total | unchanged |
 | acceptance | acceptance | unchanged |
+| skim | acceptance | multiplied by the `theory_norm` region's varied/nominal yield, divided by the generator-level ratio |
+| skim | total | multiplied by the `theory_norm` region's varied/nominal yield |
+
+The denominator of an acceptance-only variation is always the generator cross
+section (`Runs/LHEScaleSumw`), never a yield after a skim or preselection.
 
 The ratios are in `theory_inclusive.yaml`, per nuisance, signal hypothesis and era:
 the varied over the nominal generator-level cross section (`Runs/LHEScaleSumw`,

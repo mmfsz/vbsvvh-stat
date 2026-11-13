@@ -166,12 +166,28 @@ def validate(channel, analysis, shapes=None):
     theory = sorted({n for p in signals for n in shapes.nuisances(process=p) if analysis.is_theory(n)})
     if theory and not channel.get("theory"):
         errors.append(f"signal carries {theory}: declare in channel.yaml whether they are delivered "
-                      "'theory: raw' (cross section included) or 'theory: acceptance' (see INPUTS.md)")
+                      "'theory: raw' (cross section included), 'theory: acceptance' or 'theory: skim' "
+                      "(see INPUTS.md)")
+    norm = channel.get("theory_norm")
+    if norm:
+        for era in shapes.eras:
+            for p in signals:
+                carried = [n for n in shapes.nuisances(era, p) if analysis.is_theory(n)]
+                if not carried:
+                    continue
+                if (era, norm, p, None, None) not in shapes.hists:
+                    errors.append(f"{era}/{norm}/{p}: theory: skim needs the signal's post-skim yield "
+                                  "in the normalisation region")
+                    continue
+                missing = [n for n in carried for d in ("Up", "Down")
+                           if (era, norm, p, n, d) not in shapes.hists]
+                if missing:
+                    errors.append(f"{era}/{norm}/{p}: normalisation region lacks {sorted(set(missing))}")
 
     for era in shapes.eras:
         for region in shapes.regions(era):
             procs = shapes.processes(era, region)
-            if DATA not in procs:
+            if DATA not in procs and region != norm:
                 errors.append(f"{era}/{region}: no {DATA}")
             for p in procs:
                 if p == DATA:
